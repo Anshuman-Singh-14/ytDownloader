@@ -3,9 +3,11 @@ venv/
 env/
 .env/
 
-# Log files
+# Log files and archives
 *.log
 downloader.log*
+logs/
+.log_tracker
 
 # Downloaded Media Files
 *.mp4
@@ -17,7 +19,3 @@ downloader.log*
 # Python Cache
 __pycache__/
 *.pyc
-
-# External Binaries (if you used the drag-and-drop method)
-ffmpeg.exe
-ffprobe.exe
