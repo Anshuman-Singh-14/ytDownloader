@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import ttk, messagebox  # 'ttk' added for the Progressbar widget
 import yt_dlp
 import threading
 import logging
@@ -9,28 +9,22 @@ import sys
 # ==========================================
 # 1. INDUSTRY-GRADE LOGGING SETUP
 # ==========================================
-# Create the root logger for the app
 app_logger = logging.getLogger("YTDownloader")
 app_logger.setLevel(logging.DEBUG)
 
-# Define a strict format: Time | Level | Thread | Message
 log_format = logging.Formatter(
     fmt='%(asctime)s | %(levelname)-8s | %(threadName)-15s | %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# File Handler: Creates 'downloader.log'
-# Rotates automatically at 5MB per file, keeping 3 historical backups
 file_handler = RotatingFileHandler('downloader.log', maxBytes=5*1024*1024, backupCount=3)
 file_handler.setFormatter(log_format)
 file_handler.setLevel(logging.DEBUG)
 
-# Console Handler: Pushes logs to the terminal as well
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setFormatter(log_format)
 console_handler.setLevel(logging.INFO)
 
-# Attach handlers to the logger
 app_logger.addHandler(file_handler)
 app_logger.addHandler(console_handler)
 
@@ -40,9 +34,7 @@ app_logger.info("Application started. Logger initialized.")
 # 2. CUSTOM YT-DLP LOGGER INJECTION
 # ==========================================
 class YTDLPLogger:
-    """Redirects yt-dlp's internal console printouts into our Python logger."""
     def debug(self, msg):
-        # yt-dlp uses the 'debug' channel for most of its standard download progress output
         if msg.startswith('[debug]'):
             app_logger.debug(f"yt-dlp: {msg}")
         else:
@@ -69,24 +61,40 @@ def download_video():
     
     app_logger.info(f"Download initiated by user for URL: {url}")
     
-    # Run the download in a background thread to prevent UI freezing
     thread = threading.Thread(target=process_download, args=(url,), name="DownloadWorker")
     thread.start()
 
 def process_download(url):
     app_logger.debug("Background thread started successfully.")
     
-    # Safely update Tkinter from a background thread using root.after
-    root.after(0, lambda: status_label.config(text="Downloading... Check downloader.log for details", fg="blue"))
+    # Disable button and reset progress bar
     root.after(0, lambda: download_btn.config(state=tk.DISABLED))
+    root.after(0, lambda: progress_var.set(0))
+    root.after(0, lambda: status_label.config(text="Connecting...", fg="blue"))
     
+    # --- NEW: Progress Hook ---
+    def progress_hook(d):
+        if d['status'] == 'downloading':
+            total = d.get('total_bytes') or d.get('total_bytes_estimate')
+            downloaded = d.get('downloaded_bytes', 0)
+            if total:
+                percent = (downloaded / total) * 100
+                # Safely update the GUI variables from this background thread
+                root.after(0, lambda: progress_var.set(percent))
+                root.after(0, lambda: status_label.config(text=f"Downloading... {percent:.1f}%", fg="blue"))
+        
+        elif d['status'] == 'finished':
+            root.after(0, lambda: progress_var.set(100))
+            root.after(0, lambda: status_label.config(text="Download complete. Merging audio & video...", fg="orange"))
+
     ydl_opts = {
         'format': 'bestvideo[height<=1080]+bestaudio/best',
         'outtmpl': '%(title)s.%(ext)s',
         'merge_output_format': 'mp4',
-        'logger': YTDLPLogger(), # Inject our custom logger
-        'quiet': True,           # Suppress direct console prints
-        'no_warnings': False
+        'logger': YTDLPLogger(),
+        'quiet': True,
+        'no_warnings': False,
+        'progress_hooks': [progress_hook]  # Attach the hook here
     }
 
     try:
@@ -96,11 +104,10 @@ def process_download(url):
             ydl.download([url])
         
         app_logger.info("Download and merge completed successfully.")
-        root.after(0, lambda: status_label.config(text="✅ Download completed successfully!", fg="green"))
+        root.after(0, lambda: status_label.config(text="✅ Process completed successfully!", fg="green"))
         root.after(0, lambda: url_entry.delete(0, tk.END))
         
     except Exception as e:
-        # exc_info=True logs the full traceback alongside the error
         app_logger.error(f"A critical error occurred during download: {str(e)}", exc_info=True)
         root.after(0, lambda: status_label.config(text="❌ Download failed. Check logs.", fg="red"))
         root.after(0, lambda: messagebox.showerror("Download Error", "An error occurred. Check downloader.log for details."))
@@ -118,10 +125,9 @@ def on_closing():
 
 root = tk.Tk()
 root.title("YouTube 1080p Downloader - Pro")
-root.geometry("450x200")
+# Increased height from 200 to 250 to make room for the progress bar
+root.geometry("450x250") 
 root.resizable(False, False)
-
-# Catch the close event ("X" button) to log it before quitting
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
 tk.Label(root, text="Paste YouTube Link Here:", font=("Helvetica", 12)).pack(pady=(20, 5))
@@ -133,6 +139,11 @@ download_btn = tk.Button(
     bg="#ff0000", fg="white", command=download_video
 )
 download_btn.pack(pady=10)
+
+# --- NEW: Progress Bar Widget ---
+progress_var = tk.DoubleVar()
+progress_bar = ttk.Progressbar(root, variable=progress_var, maximum=100, length=300)
+progress_bar.pack(pady=(0, 5))
 
 status_label = tk.Label(root, text="Waiting for URL...", font=("Helvetica", 10), fg="gray")
 status_label.pack(pady=5)
