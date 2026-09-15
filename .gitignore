@@ -1,0 +1,23 @@
+# Virtual Environments
+venv/
+env/
+.env/
+
+# Log files
+*.log
+downloader.log*
+
+# Downloaded Media Files
+*.mp4
+*.webm
+*.mkv
+*.mp3
+*.m4a
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# External Binaries (if you used the drag-and-drop method)
+ffmpeg.exe
+ffprobe.exe
