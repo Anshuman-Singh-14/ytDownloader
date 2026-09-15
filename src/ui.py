@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from logger_setup import setup_logger
+import os
 
 logger = setup_logger()
 
@@ -29,6 +30,15 @@ class AdeptusAstartesUI:
         self._center_window(600, 350)
         self.root.resizable(False, False)
         
+        # --- BIND THE AQUILA ICON ---
+        # This tells Python to step out of the 'src' folder to find the icon in the root
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "aquila.ico")
+        if os.path.exists(icon_path):
+            self.root.iconbitmap(icon_path)
+        else:
+            logger.warning(f"Holy icon not found at: {icon_path}")
+        # ----------------------------
+            
         self._setup_styles()
         self._build_widgets()
 
@@ -136,7 +146,6 @@ class AdeptusAstartesUI:
 
     def _cb_progress(self, percent, text):
         self.root.after(0, lambda: self.progress_var.set(percent))
-        # Override the default text from the downloader with 40k flavor
         flavor_text = f"Extracting from Noosphere... {percent:.1f}%"
         self.root.after(0, lambda: self.status_label.config(text=flavor_text, fg=FG_TEXT))
 
